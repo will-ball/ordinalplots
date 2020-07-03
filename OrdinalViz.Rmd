@@ -13,7 +13,7 @@ The code outlined below demonstrates a few simple ways of visualising the relati
 
 You could present this information in a series of tables, or as a contingency table which shows the frequency distribution of the two variables in a matrix format.
 
-Instead, it might be easier to express (or quickly assess) the relationship between the variables using one/all of these four plots:
+Instead, it might be easier to explain (or quickly assess) the relationship between the variables using one/all of these four plots:
 
 1. Heatmap
 2. Mosaic Plot

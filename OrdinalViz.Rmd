@@ -1,0 +1,223 @@
+---
+title: "Visualising two ordinal variables using R"
+author: "Will Ball"
+date: "03/07/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The code outlined below demonstrates a few simple ways of visualising the relationship between two ordinal variables. Ordinal variables are ordered factors in R - a variable with a number of levels arranged in a hierarchy. For the purposes of this, we will be looking at a 5-level measure of Deprivation and a 5-level measure of Self-Rated Health.
+
+You could present this information in a series of tables, or as a contingency table which shows the frequency distribution of the two variables in a matrix format.
+
+Instead, it might be easier to express (or quickly assess) the relationship between the variables using one/all of these four plots:
+
+1. Heatmap
+2. Mosaic Plot
+3. Proportional Stacked Bar Chart
+4. River Plot
+
+## Getting Started
+#### Packages
+
+Before we start creating plots, we need to install and load the following packages. We're mostly using ggplot2, but also some add-ons. You should use `install.packages("pkg")` before loading them from the library.
+
+```{r packages, <code>, warning = FALSE, message = FALSE}
+library(tidyverse)
+library(ggmosaic)
+library(viridis)
+library(ggalluvial)
+```
+
+
+#### Data
+
+We also need to create a dummy dataset to make the visualisation.
+
+I'm creating a tibble with the following variables:
+
+- __ID:__ to identify individuals
+- __group:__ a subset of the population
+- __health:__ 5-levels, ordered from 1 = Very Good to 5 = Very Poor
+- __deprivation:__ 5-levels, ordered from 1 = Least Deprived to 5 = Most Deprived
+
+Note that I'm also specifying the distribution of the levels so that they don't come out as equally distributed (and result in a pretty boring visualisation).
+
+```{r dummy data, <code>}
+mockup <- as_tibble(
+  list(
+        ID = c(1:5000),
+        group = as.factor(sample(0:1, 5000, prob = c(0.7, 0.3), replace = TRUE)),
+        health = as.factor(sample(1:5,
+                             5000, prob = c(0.25, 0.21, 0.10, 0.05, 0.03), replace = TRUE)), 
+        deprivation = as.factor(sample(1:5,
+                                   5000, prob = c(0.22, 0.17, 0.14, 0.14, 0.10), replace = TRUE))
+        )
+      )
+head(mockup)
+```
+
+
+## Plots
+### Option 1: Heatmap
+
+A heatmap shows the magnitude or frequency of an observation as colour in 2D. It works essentially like a contingency table but rather than showing the raw numbers, you can see the colour variation.
+
+For comparison here's a very simple contingency table.
+
+```{r contingency, <code>}
+my_table <- mockup %>% 
+  group_by(deprivation, health) %>% 
+  tally() %>% 
+  spread(key = health, value = n)
+print.data.frame(my_table)
+```
+And here's how we build the heatmap plot. I've re-oriented the x axis label and reversed the order displayed for the y axis so that it's equivalent to the contingency table output. Which do you think is easier to understand?
+
+```{r heatmap, echo = TRUE}
+ggplot(mockup, aes(deprivation, health)) + 
+  scale_fill_viridis() +
+  geom_bin2d() +
+  scale_x_discrete(name = "Deprivation Quintile",
+                   position = "top") +
+  scale_y_discrete(name = "Self-Rated Health",
+                   limits = rev(levels(mockup$health))) +
+  labs(title = "Self-Rated Health by UKIMD Quintile",
+       subtitle = "Deprivation: 1 = Least Deprived | Health: 1 = Very Good",
+       caption = "Plot by @WillBall12") +
+  theme_minimal() +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank())
+```
+
+
+### Option 2: Mosaic Plot
+
+A mosaic plot is very similar to a heatmap, except that the frequency of an observation (e.g. response is Deprivation group 1 & Health group 1) is proportional to the area of a tile, rather than by colour. Colour in this instance distinguishes the self-rated health response.
+
+```{r mosaic, echo = TRUE}
+ggplot(data = mockup) +
+  geom_mosaic(aes(x = product(health, deprivation), fill = health),
+              na.rm=TRUE) + 
+  labs(x = "Deprivation Quintile", 
+       y = "Proportion", 
+       title="Self-Rated Health by Deprivation Quintile",
+       subtitle = "Left - Right = (1) Least Deprived - (5) Most Deprived",
+       caption = "Plot by @WillBall12") +
+  scale_fill_manual(values=c("#440145FF", "#404788FF", "#238A8DFF", "#55C667FF", "#FDE725FF"), 
+                    name="Self-Rated Health",
+                    breaks=c("1", "2", "3", "4", "5"),
+                    labels=c("1 - Very Good", "2", "3", "4", "5 - Very Poor")) +
+  theme_minimal() +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank())
+```
+
+
+
+### Option 3: Proportional Stacked Bar Chart
+
+This might be a more familiar and common visualisation but it does a nice job of quickly presenting how levels of a category are distributed. I think it's preferable to providing a table of percentages.
+
+```{r Proportional Stack Bar Chart}
+ggplot(mockup,
+       aes(y = reorder(deprivation, desc(deprivation)))) +
+  geom_bar(aes(fill = health),
+           position = position_fill(reverse = TRUE)) +
+  scale_fill_manual(values=c("#440145FF", "#404788FF", "#238A8DFF", "#55C667FF", "#FDE725FF"), 
+                    name="Self-Rated Health",
+                    breaks=c("1", "2", "3", "4", "5"),
+                    labels=c("Very Good", "Good", "Fair", "Poor", "Very Poor")) +
+  labs(title = "Proportion of Self-Rated Health Response by Deprivation Quintile",
+       subtitle = "Deprivation: 1 = Least Deprived - 5 = Most Deprived",
+       x = "Proportion",
+       y = "Deprivation Quintile",
+       caption = "Plot by @WillBall12") +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank())
+```
+
+This plot is also quite well suited to comparing these distributions on a subset. Remember the __group__ variable? You can create the plot below by adding `+ facet_grid(group~.)` to the end of the code.
+
+```{r facet, echo = FALSE}
+ggplot(mockup,
+       aes(y = reorder(deprivation, desc(deprivation)))) +
+  geom_bar(aes(fill = health),
+           position = position_fill(reverse = TRUE)) +
+  scale_fill_manual(values=c("#440145FF", "#404788FF", "#238A8DFF", "#55C667FF", "#FDE725FF"), 
+                    name="Self-Rated Health",
+                    breaks=c("1", "2", "3", "4", "5"),
+                    labels=c("Very Good", "Good", "Fair", "Poor", "Very Poor")) +
+  labs(title = "Proportion of Self-Rated Health Response by Deprivation Quintile",
+       subtitle = "Deprivation: 1 = Least Deprived - 5 = Most Deprived",
+       x = "Proportion",
+       y = "Deprivation Quintile",
+       caption = "Plot by @WillBall12") +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank()) +
+  facet_grid(group~.)
+```
+
+
+### Option 4: River/Alluvial/Sankey Plot
+
+River plots are normally used to show 'flow' through a process but it's possible to adapt them to to show how two categorical variables relate to each other.
+
+Before we can produce the plot, it's necessary to create a frequency table of all the variables of interest. Below you'll see that each row is now a unique combination of the levels.
+
+For instance we can see how many people who are in the '0' group subset, with 'Very Good' health, living in the least deprived areas.
+
+```{r frequency table, <code>, echo = TRUE}
+mockup_freq <- mockup %>%
+  dplyr::count(health, deprivation) %>%
+  mutate(proptot = prop.table(n))
+head(mockup_freq)
+```
+
+
+Here's how we make the riverplot itself. It uses the `geom_alluvium()` and `geom_stratum()` function which is an extension to ggplot2 from the ggalluvial package.
+
+```{r riverplot, echo = TRUE, warning = FALSE}
+ggplot(as.data.frame(mockup_freq),
+       aes(y = proptot, axis1 = deprivation, 
+           axis2 = health)) +
+  geom_alluvium(aes(fill = deprivation), 
+                width = 1/12) +
+  geom_stratum(width = 1/12, 
+               fill = "black", 
+               colour = "grey") +
+  geom_label(stat = "stratum",
+             infer.label = TRUE) +
+  scale_x_discrete(limits = c("deprivation", "health"),
+                   expand = c(.05, .05),
+                   labels = c("Deprivation\nQuintile", "Self-Rated\nHealth")) +
+  ggtitle("'Flow' of Self-Rated Health from Deprivation Quintile") +
+  scale_fill_manual(values=c("#440145FF", "#404788FF", "#238A8DFF", "#55C667FF", "#FDE725FF"), 
+                    name="Deprivation Quintile",
+                    breaks=c("1", "2", "3", "4", "5"),
+                    labels=c("1 - Least Deprived", "2", "3", "4", "5 - Most Deprived")) +
+  theme_minimal() +
+  theme(legend.position = "right",
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank()) +
+  labs(y = "Proportion of total",
+       subtitle = "Deprivation Quintile (1 = Least Deprived) | Self-Rated Health (1 = Very Good)",
+       caption = "Plot by @WillBall12")
+```
+
+### Further Reading
+
+That's a quick introduction to just 4 ways that you could present this type of information. I'm sure there are many others and quite possibly some of them will be simpler and/or neater than what I have come up with.
+
+#### ggplot2
+For more information about ggplot2 in general you can't go wrong with the 'Data Visualisation' and 'Graphics for Communication' sections from [R for Data Science](https://r4ds.had.co.nz/)
+
+#### ggalluvial
+The code for my alluvial/riverplot was adapted from [this](https://cran.r-project.org/web/packages/ggalluvial/vignettes/ggalluvial.html) tutorial produced by Jason Corey Brunson
